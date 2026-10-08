@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "445409008122",
+    "project_id": "mycursmobb-a7ee3",
+    "storage_bucket": "mycursmobb-a7ee3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:445409008122:android:7cd0bfd0cff20c0b762c43",
+        "android_client_info": {
+          "package_name": "com.example.mycursmob"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyGazYlMzk52mwyhU7zvp8To7gUiJhs3g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
