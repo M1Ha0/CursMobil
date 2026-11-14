@@ -1,6 +1,9 @@
 package com.example.mycursmob.presentation.home
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,12 +23,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mycursmob.R
 import com.example.mycursmob.presentation.auth.AuthViewModel
+import com.example.mycursmob.presentation.nutrition.MealViewModel
 import com.example.mycursmob.ui.theme.*
 import java.io.File
 import java.text.SimpleDateFormat
@@ -34,12 +40,16 @@ import java.util.*
 @Composable
 fun HomeScreen(
     authViewModel: AuthViewModel,
+    mealViewModel: MealViewModel,
     onLogout: () -> Unit,
     onNavigateToAvatarSelection: () -> Unit = {},
     onNavigateToNutrition: () -> Unit = {},
     onNavigateToHydration: () -> Unit = {}
 ) {
     val authState by authViewModel.uiState.collectAsState()
+    val mealUiState by mealViewModel.uiState.collectAsState()
+    val todayCalories = mealUiState.todayTotalCalories
+    var showCalorieCard by remember { mutableStateOf(false) }
     val user = authState.currentUser
     val displayName = user?.fullName?.ifEmpty { null }
         ?: user?.userName?.ifEmpty { null }
@@ -291,6 +301,8 @@ fun HomeScreen(
                             selectedCategory = name
                             if (name == "Hydration") {
                                 onNavigateToHydration()
+                            } else if (name == "Calorie") {
+                                showCalorieCard = !showCalorieCard
                             }
                         }
                         .padding(horizontal = 16.dp, vertical = 10.dp)
@@ -303,6 +315,62 @@ fun HomeScreen(
                             color = contentColor,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+
+        // ───────────── Calorie Goal Card (Appears when clicking Calorie) ─────────────
+        AnimatedVisibility(
+            visible = showCalorieCard,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 18.dp)
+            ) {
+                Text(
+                    text = "Calorie Goal",
+                    color = TextPrimary,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Big Orange Card (Figma exact match from user image)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = CardDefaults.cardColors(containerColor = BrandOrange)
+                ) {
+                    Column(modifier = Modifier.padding(22.dp)) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "$todayCalories",
+                                color = Color.White,
+                                fontSize = 42.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                lineHeight = 44.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Kilo calories",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Custom Peach Slider / Progress Indicator
+                        CalorieGoalSlider(
+                            currentCalories = todayCalories,
+                            goalCalories = 2500
                         )
                     }
                 }
@@ -623,6 +691,75 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Custom Slider / Progress Indicator matching Figma Calorie Goal:
+ * Peach background container, white track, orange squircle thumb positioned by today's calories.
+ */
+@Composable
+private fun CalorieGoalSlider(
+    currentCalories: Int,
+    goalCalories: Int = 2500
+) {
+    val density = LocalDensity.current
+    var sliderWidthPx by remember { mutableFloatStateOf(1f) }
+    val thumbWidthDp = 48.dp
+    val thumbWidthPx = with(density) { thumbWidthDp.toPx() }
+
+    val targetFraction = (currentCalories.toFloat() / goalCalories.toFloat()).coerceIn(0f, 1f)
+    val animatedFraction by animateFloatAsState(
+        targetValue = targetFraction,
+        animationSpec = tween(durationMillis = 600),
+        label = "calorieProgress"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(CalorieSliderPeach)
+            .onGloballyPositioned { coordinates ->
+                sliderWidthPx = coordinates.size.width.toFloat()
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        // White Track line
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White)
+        )
+
+        // Orange Squircle Thumb
+        val availableWidthDp = with(density) {
+            val aw = (sliderWidthPx - thumbWidthPx).coerceAtLeast(0f)
+            aw.toDp()
+        }
+        val thumbOffset = availableWidthDp * animatedFraction
+
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset + 4.dp)
+                .size(thumbWidthDp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(BrandOrange)
+                .border(3.dp, Color.White, RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            // Inner small dot/square matching Figma
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White)
+            )
         }
     }
 }

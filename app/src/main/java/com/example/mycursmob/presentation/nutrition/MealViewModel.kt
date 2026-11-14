@@ -28,6 +28,14 @@ data class MealUiState(
 
     val currentMeals: List<MealItem>
         get() = mealsMap[currentKey] ?: emptyList()
+
+    val todayTotalCalories: Int
+        get() {
+            val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())
+            return MealCategory.entries.sumOf { cat ->
+                (mealsMap["${todayKey}_${cat.name}"] ?: emptyList()).sumOf { it.calories }
+            }
+        }
 }
 
 class MealViewModel : ViewModel() {

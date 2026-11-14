@@ -169,6 +169,7 @@ fun FitnessAppNavigation() {
         composable("home") {
             HomeScreen(
                 authViewModel = authViewModel,
+                mealViewModel = mealViewModel,
                 onLogout = {
                     navController.navigate("welcome") {
                         popUpTo("home") { inclusive = true }
