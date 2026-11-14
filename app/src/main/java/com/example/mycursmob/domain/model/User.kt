@@ -13,5 +13,6 @@ data class User(
     val fitnessLevel: Int = 0,
     val fitnessLevelName: String = "",
     val gender: String = "",
-    val fitnessGoals: List<String> = emptyList()
+    val fitnessGoals: List<String> = emptyList(),
+    val avatarPath: String = ""
 )

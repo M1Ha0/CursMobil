@@ -1,7 +1,7 @@
 package com.example.mycursmob.presentation.home
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -16,11 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,13 +27,17 @@ import androidx.compose.ui.unit.sp
 import com.example.mycursmob.R
 import com.example.mycursmob.presentation.auth.AuthViewModel
 import com.example.mycursmob.ui.theme.*
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun HomeScreen(
     authViewModel: AuthViewModel,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToAvatarSelection: () -> Unit = {},
+    onNavigateToNutrition: () -> Unit = {},
+    onNavigateToHydration: () -> Unit = {}
 ) {
     val authState by authViewModel.uiState.collectAsState()
     val user = authState.currentUser
@@ -46,8 +49,6 @@ fun HomeScreen(
     val today = remember {
         SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH).format(Date())
     }
-
-    var calorieGoal by remember { mutableFloatStateOf(2500f) }
 
     Column(
         modifier = Modifier
@@ -71,21 +72,67 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Profile info with avatar placeholder
+                    // Profile info with avatar (Clickable to change avatar)
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val avatarPath = user?.avatarPath ?: ""
+                        val customBitmap = remember(avatarPath) {
+                            if (avatarPath.isNotEmpty() && File(avatarPath).exists()) {
+                                try {
+                                    BitmapFactory.decodeFile(avatarPath)?.asImageBitmap()
+                                } catch (_: Exception) { null }
+                            } else null
+                        }
+
                         Box(
                             modifier = Modifier
-                                .size(54.dp)
+                                .size(56.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(BrandDarkGray),
+                                .background(BrandDarkGray)
+                                .clickable { onNavigateToAvatarSelection() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = "Profile",
-                                tint = Color.White.copy(alpha = 0.85f),
-                                modifier = Modifier.size(28.dp)
-                            )
+                            when {
+                                customBitmap != null -> {
+                                    Image(
+                                        bitmap = customBitmap,
+                                        contentDescription = "User Avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                avatarPath == "premade_bunny" -> {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.avatar_premade_bunny),
+                                        contentDescription = "Avatar Bunny",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                avatarPath == "premade_beanie" -> {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.avatar_premade_beanie),
+                                        contentDescription = "Avatar Beanie",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                avatarPath == "premade_cat" -> {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.avatar_premade_cat),
+                                        contentDescription = "Avatar Cat",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                else -> {
+                                    Icon(
+                                        imageVector = Icons.Filled.Person,
+                                        contentDescription = "Profile",
+                                        tint = Color.White.copy(alpha = 0.85f),
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
@@ -218,11 +265,12 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(14.dp))
         }
 
-        var selectedCategory by remember { mutableStateOf("Vegetable") }
+        var selectedCategory by remember { mutableStateOf("Hydration") }
         val categories = listOf(
-            Triple("💧", "Vegetable", CategoryVegetableBlue),
-            Triple("🤍", "Meat", CategoryChipBg),
-            Triple("🍐", "Fruit", CategoryChipBg),
+            Triple("💧", "Hydration", CategoryVegetableBlue),
+            Triple("🖤", "Score", CategoryChipBg),
+            Triple("🍐", "Calorie", CategoryChipBg),
+            Triple("🥩", "Meat", CategoryChipBg),
             Triple("🥛", "Dairy", CategoryChipBg),
             Triple("🍞", "Grains", CategoryChipBg)
         )
@@ -239,7 +287,12 @@ fun HomeScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(bg)
-                        .clickable { selectedCategory = name }
+                        .clickable {
+                            selectedCategory = name
+                            if (name == "Hydration") {
+                                onNavigateToHydration()
+                            }
+                        }
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -258,7 +311,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(26.dp))
 
-        // ───────────── Morning Routine Section ─────────────
+        // ───────────── Workouts Section (Figma Exact Match) ─────────────
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -266,7 +319,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Morning Routine",
+                    text = "Workouts",
                     color = TextPrimary,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
@@ -279,211 +332,297 @@ fun HomeScreen(
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
-        }
 
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Card 1: Runner's Diet (Green Card from Figma)
-            item {
-                Image(
-                    painter = painterResource(id = R.drawable.card_runner_diet),
-                    contentDescription = "Runner's Diet",
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier
-                        .width(168.dp)
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                )
-            }
-
-            // Card 2: Power Meal / Breakfast (Yellow Card from Figma)
-            item {
-                Image(
-                    painter = painterResource(id = R.drawable.card_power_meal),
-                    contentDescription = "Power Meal",
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier
-                        .width(136.dp)
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                )
-            }
-
-            // Card 3: MORE Card (Black vertical card matching Figma)
-            item {
-                Box(
-                    modifier = Modifier
-                        .width(48.dp)
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(BrandDark),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxHeight(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Arrow Circle Button at Top
-                        Box(
-                            modifier = Modifier
-                                .padding(top = 10.dp)
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ChevronRight,
-                                contentDescription = "More",
-                                tint = BrandDark,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        // Rotated Text "MORE"
-                        Text(
-                            text = "MORE",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier
-                                .padding(bottom = 20.dp)
-                                .rotate(-90f)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        // ───────────── Calorie Goal Section (Figma Exact Match) ─────────────
-        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Text(
-                text = "Calorie Goal",
-                color = TextPrimary,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Big Orange Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = BrandOrange)
-            ) {
-                Column(
-                    modifier = Modifier.padding(22.dp)
-                ) {
-                    // Number + Unit Row
-                    Row(
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Text(
-                            text = "${calorieGoal.toInt()}",
-                            color = Color.White,
-                            fontSize = 42.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            lineHeight = 44.sp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Kilo calories",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Peach Slider Container
-                    CalorieGoalSlider(
-                        value = calorieGoal,
-                        onValueChange = { calorieGoal = it }
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Custom Slider matching Figma Screen 2 Calorie Goal:
- * Peach background container, white track, orange squircle thumb with white border.
- */
-@Composable
-private fun CalorieGoalSlider(
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    minVal: Float = 1000f,
-    maxVal: Float = 4000f
-) {
-    val density = LocalDensity.current
-    var sliderWidthPx by remember { mutableFloatStateOf(1f) }
-    val thumbWidthDp = 48.dp
-    val thumbWidthPx = with(density) { thumbWidthDp.toPx() }
-
-    val fraction = ((value - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(CalorieSliderPeach)
-            .onGloballyPositioned { coordinates ->
-                sliderWidthPx = coordinates.size.width.toFloat()
-            }
-            .pointerInput(Unit) {
-                detectDragGestures { change, _ ->
-                    val availableWidth = (sliderWidthPx - thumbWidthPx).coerceAtLeast(1f)
-                    val newX = (change.position.x - thumbWidthPx / 2f).coerceIn(0f, availableWidth)
-                    val newFraction = newX / availableWidth
-                    val newVal = minVal + newFraction * (maxVal - minVal)
-                    onValueChange(newVal)
-                }
-            },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        // Track line
-        Box(
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .fillMaxWidth()
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White)
-        )
-
-        // Orange Squircle Thumb
-        val availableWidthDp = with(density) {
-            val aw = (sliderWidthPx - thumbWidthPx).coerceAtLeast(0f)
-            aw.toDp()
-        }
-        val thumbOffset = availableWidthDp * fraction
-
-        Box(
-            modifier = Modifier
-                .offset(x = thumbOffset + 4.dp)
-                .size(thumbWidthDp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(BrandOrange)
-                .border(3.dp, Color.White, RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            // Inner small dot/square
             Box(
                 modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color.White)
-            )
+                    .fillMaxWidth()
+                    .height(176.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(BrandDark)
+            ) {
+                // Background image: Man lifting dumbbells
+                Image(
+                    painter = painterResource(id = R.drawable.workout_upper_strength),
+                    contentDescription = "Upper Strength 2",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Subtle dark gradient scrim for readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.35f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.65f)
+                                )
+                            )
+                        )
+                )
+
+                // Top Left Badges: 25min and 412kcal
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, start = 18.dp, end = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "25min",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "412kcal",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Bottom Content: Upper Strength 2, 8 Series Workout & Orange Squircle Play Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomStart)
+                        .padding(start = 18.dp, end = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Column {
+                        Text(
+                            text = "Upper Strength 2",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "8 Series Workout",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+
+                    // Orange Squircle Play Button
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(BrandOrange)
+                            .clickable { },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "Start Workout",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(26.dp))
+
+        // ───────────── Diet & Nutrition Section (Figma Exact Match) ─────────────
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Diet & Nutrition",
+                    color = TextPrimary,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onNavigateToNutrition() }
+                )
+                Text(
+                    text = "See All",
+                    color = BrandOrange,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { onNavigateToNutrition() }
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(152.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(CategoryChipBg)
+                    .clickable { onNavigateToNutrition() }
+            ) {
+                // Salad plate entering from right
+                Image(
+                    painter = painterResource(id = R.drawable.diet_salad_egg),
+                    contentDescription = "Salad & Egg",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(185.dp)
+                        .align(Alignment.CenterEnd)
+                )
+
+                // Left stats & title
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(start = 18.dp, top = 16.dp, bottom = 16.dp, end = 16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Pill 1: 25g Protein
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "25g",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "Protein",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        // Pill 2: 16g Fats
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "16g",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "Fats",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+
+                    Column {
+                        Text(
+                            text = "Salad & Egg",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "548kcal",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = "20min",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(26.dp))
+
+        // ───────────── Activities Section (Figma Exact Match) ─────────────
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Activities",
+                    color = TextPrimary,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "See All",
+                    color = BrandOrange,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(156.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(CategoryChipBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier.wrapContentSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.activity_blocks),
+                        contentDescription = "Activities",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .height(126.dp)
+                    )
+
+                    // 7h Red Badge positioned over bottom-left corner
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .offset(x = 12.dp, y = (-4).dp)
+                            .rotate(-22f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF74343))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "7h",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }

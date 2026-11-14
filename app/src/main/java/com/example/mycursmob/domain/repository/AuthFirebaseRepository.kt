@@ -118,7 +118,8 @@ class AuthFirebaseRepository {
         fitnessLevel: Int,
         fitnessLevelName: String,
         gender: String,
-        fitnessGoals: List<String>
+        fitnessGoals: List<String>,
+        avatarPath: String = ""
     ): Result<User> {
         val current = UserSessionManager.getCurrentUser()
             ?: LocalAuthStore.currentUser
@@ -132,7 +133,8 @@ class AuthFirebaseRepository {
             fitnessLevel = fitnessLevel,
             fitnessLevelName = fitnessLevelName,
             gender = gender,
-            fitnessGoals = fitnessGoals
+            fitnessGoals = fitnessGoals,
+            avatarPath = if (avatarPath.isNotEmpty()) avatarPath else current.avatarPath
         )
 
         LocalAuthStore.currentUser = updatedUser
@@ -143,9 +145,24 @@ class AuthFirebaseRepository {
             fitnessLevel = fitnessLevel,
             fitnessLevelName = fitnessLevelName,
             gender = gender,
-            fitnessGoals = fitnessGoals
+            fitnessGoals = fitnessGoals,
+            avatarPath = updatedUser.avatarPath
         )
 
+        val uid = updatedUser.uid
+        if (uid.isNotEmpty()) {
+            try {
+                withTimeoutOrNull(1500L) {
+                    firestore.collection("persons").document(uid).set(updatedUser).await()
+                }
+            } catch (_: Exception) {}
+        }
+        return Result.success(updatedUser)
+    }
+
+    suspend fun saveAvatar(avatarPath: String): Result<User> {
+        val updatedUser = UserSessionManager.saveAvatar(avatarPath)
+        LocalAuthStore.currentUser = updatedUser
         val uid = updatedUser.uid
         if (uid.isNotEmpty()) {
             try {

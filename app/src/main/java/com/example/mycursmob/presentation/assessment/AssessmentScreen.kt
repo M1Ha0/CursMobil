@@ -1,5 +1,9 @@
 package com.example.mycursmob.presentation.assessment
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -15,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,10 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mycursmob.R
 import com.example.mycursmob.ui.theme.*
 import kotlinx.coroutines.launch
+import java.io.File
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -56,13 +65,14 @@ fun AssessmentScreen(
             .background(if (isWeightStep) BrandOrange else BackgroundWhite)
             .padding(top = 44.dp)
     ) {
-        // ── Top Bar with dynamic badge (1 of 6, 2 of 6, 3 of 6, 4 of 6, 6 of 6) ──
+        // ── Top Bar with dynamic badge (1 of 7, 2 of 7, 3 of 7, 4 of 7, 6 of 7, 7 of 7) ──
         val stepBadgeLabel = when (state.currentStep) {
-            1 -> "1 of 6"
-            2 -> "2 of 6"
-            3 -> "3 of 6"
-            4 -> "4 of 6"
-            else -> "6 of 6"
+            1 -> "1 of 7"
+            2 -> "2 of 7"
+            3 -> "3 of 7"
+            4 -> "4 of 7"
+            5 -> "6 of 7"
+            else -> "7 of 7"
         }
 
         AssessmentTopBar(
@@ -102,6 +112,10 @@ fun AssessmentScreen(
                 5 -> GoalStep(
                     selectedGoals = state.fitnessGoals,
                     onGoalToggle = { viewModel.onGoalToggle(it) }
+                )
+                6 -> AvatarSelectionStep(
+                    selectedAvatar = state.avatarPath,
+                    onAvatarChange = { viewModel.onAvatarChange(it) }
                 )
             }
         }
@@ -209,7 +223,6 @@ private fun AgeWheelStep(
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
-    // Listen to wheel scroll and update selected age
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { index ->
@@ -234,14 +247,12 @@ private fun AgeWheelStep(
 
         Spacer(modifier = Modifier.height(36.dp))
 
-        // Spinning Wheel Container
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(itemHeightDp * 5),
             contentAlignment = Alignment.Center
         ) {
-            // Orange rounded selection card in the exact vertical center
             Box(
                 modifier = Modifier
                     .width(96.dp)
@@ -250,7 +261,6 @@ private fun AgeWheelStep(
                     .background(BrandOrange)
             )
 
-            // Scrollable LazyColumn with snapping
             LazyColumn(
                 state = listState,
                 flingBehavior = snapFlingBehavior,
@@ -308,7 +318,6 @@ private fun WeightStep(
         )
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Kg / Lbs toggle buttons matching Figma
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
@@ -336,7 +345,6 @@ private fun WeightStep(
 
         Spacer(modifier = Modifier.height(36.dp))
 
-        // Huge weight number display
         val displayWeight = if (isKg) weight else (weight * 2.205).toInt()
         val unit = if (isKg) "Kg" else "Lbs"
         Text(
@@ -348,7 +356,6 @@ private fun WeightStep(
 
         Spacer(modifier = Modifier.height(36.dp))
 
-        // Ruler scale with tick marks & numbers (50, 55, 60, 65, 70, 75, 80)
         val weightRange = remember { (30..150).toList() }
         val listState = rememberLazyListState()
         val coroutineScope = rememberCoroutineScope()
@@ -434,7 +441,6 @@ private fun FitnessLevelArcStep(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Drag to adjust subtitle
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Filled.Sync,
@@ -452,7 +458,6 @@ private fun FitnessLevelArcStep(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // ── Custom Arc Gauge + Number Display matching Figma Screen 3 ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -460,13 +465,11 @@ private fun FitnessLevelArcStep(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            // Arc Gauge Canvas
             Box(
                 modifier = Modifier
                     .size(190.dp)
                     .pointerInput(Unit) {
                         detectDragGestures { change, _ ->
-                            // Calculate angle or horizontal drag to adjust level
                             val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
                             val newLevel = (1 + fraction * 4).toInt().coerceIn(1, 5)
                             onLevelChange(newLevel)
@@ -515,7 +518,7 @@ private fun FitnessLevelArcStep(
                         )
                     }
 
-                    // Draw end tick mark perpendicular to the arc end
+                    // End tick mark
                     val endAngleRad = Math.toRadians((startAngle + totalSweep).toDouble())
                     val radius = arcSize / 2f
                     val cx = size.width / 2f
@@ -533,7 +536,7 @@ private fun FitnessLevelArcStep(
                     )
                 }
 
-                // Orange Squircle Thumb with Circular Icon
+                // Orange Squircle Thumb
                 val fraction = (level - 1) / 4f
                 val startAngle = 145f
                 val totalSweep = 135f
@@ -561,7 +564,6 @@ private fun FitnessLevelArcStep(
 
             Spacer(modifier = Modifier.width(18.dp))
 
-            // Number + Label on Right
             Column(
                 horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.Center
@@ -605,7 +607,6 @@ private fun GenderStep(
         )
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Male Card
         GenderCard(
             label = "Male",
             iconSymbol = "♂",
@@ -616,7 +617,6 @@ private fun GenderStep(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Female Card
         GenderCard(
             label = "Female",
             iconSymbol = "♀",
@@ -627,7 +627,6 @@ private fun GenderStep(
 
         Spacer(modifier = Modifier.height(26.dp))
 
-        // Peach Skip Button matching Figma
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
@@ -670,7 +669,6 @@ private fun GenderCard(
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Radio circle
             Box(
                 modifier = Modifier
                     .size(22.dp)
@@ -694,7 +692,6 @@ private fun GenderCard(
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // Icon + Label
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = iconSymbol,
@@ -713,7 +710,6 @@ private fun GenderCard(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Runner photo from Figma
             Image(
                 painter = painterResource(id = imageRes),
                 contentDescription = label,
@@ -783,7 +779,6 @@ private fun GoalStep(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Radio indicator
                     Box(
                         modifier = Modifier
                             .size(22.dp)
@@ -807,5 +802,186 @@ private fun GoalStep(
                 }
             }
         }
+    }
+}
+
+// ──────────────────────── Step 6: Select your Avatar (Figma Screen 7) ────────────────────────
+@Composable
+private fun AvatarSelectionStep(
+    selectedAvatar: String,
+    onAvatarChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val file = File(context.filesDir, "user_avatar_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                onAvatarChange(file.absolutePath)
+            } catch (_: Exception) {}
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 3D Premade Avatars Carousel
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AssessmentPremadeAvatar(
+                imageRes = R.drawable.avatar_premade_beanie,
+                isSelected = selectedAvatar == "premade_beanie",
+                size = 78.dp,
+                onClick = { onAvatarChange("premade_beanie") }
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            AssessmentPremadeAvatar(
+                imageRes = R.drawable.avatar_premade_bunny,
+                isSelected = selectedAvatar == "premade_bunny",
+                size = 106.dp,
+                isPrimary = true,
+                onClick = { onAvatarChange("premade_bunny") }
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            AssessmentPremadeAvatar(
+                imageRes = R.drawable.avatar_premade_cat,
+                isSelected = selectedAvatar == "premade_cat",
+                size = 78.dp,
+                onClick = { onAvatarChange("premade_cat") }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Select your Avatar",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = "We have 23 custom premade avatars, or\nyou can upload profile locally",
+            color = TextSecondary,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 18.sp
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Dashed Circle Upload Container
+        val customBitmap = remember(selectedAvatar) {
+            if (selectedAvatar.isNotEmpty() && File(selectedAvatar).exists()) {
+                try {
+                    BitmapFactory.decodeFile(selectedAvatar)?.asImageBitmap()
+                } catch (_: Exception) { null }
+            } else null
+        }
+
+        Box(
+            modifier = Modifier
+                .size(116.dp)
+                .clickable { photoPickerLauncher.launch("image/*") },
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 14f), 0f)
+                )
+                drawCircle(
+                    color = if (customBitmap != null) BrandOrange else Color(0xFF777E90),
+                    radius = size.minDimension / 2f - 2.dp.toPx(),
+                    style = stroke
+                )
+            }
+
+            if (customBitmap != null) {
+                Image(
+                    bitmap = customBitmap,
+                    contentDescription = "Avatar",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(102.dp)
+                        .clip(CircleShape)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.FileUpload,
+                    contentDescription = "Upload",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Text(
+            text = "or Upload from Local File",
+            color = TextPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable { photoPickerLauncher.launch("image/*") }
+        )
+
+        Spacer(modifier = Modifier.height(3.dp))
+
+        Text(
+            text = "Max 5mb, Format: jpg,png",
+            color = TextSecondary,
+            fontSize = 12.sp
+        )
+    }
+}
+
+@Composable
+private fun AssessmentPremadeAvatar(
+    imageRes: Int,
+    isSelected: Boolean,
+    size: androidx.compose.ui.unit.Dp,
+    isPrimary: Boolean = false,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(if (isPrimary && isSelected) BrandOrange else InputBackground)
+            .border(
+                width = if (isSelected) 3.dp else 1.dp,
+                color = if (isSelected) BrandOrange else Color.Transparent,
+                shape = CircleShape
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = imageRes),
+            contentDescription = "Avatar",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }

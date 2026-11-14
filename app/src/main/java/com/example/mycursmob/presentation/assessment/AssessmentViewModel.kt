@@ -8,13 +8,14 @@ import kotlinx.coroutines.flow.update
 
 data class AssessmentUiState(
     val currentStep: Int = 1,
-    val totalSteps: Int = 5,
+    val totalSteps: Int = 6,
     val age: Int = 19,
     val weightKg: Int = 62,
     val isKgSelected: Boolean = true,
     val fitnessLevel: Int = 3,
     val gender: String = "Female",
-    val fitnessGoals: List<String> = listOf("🤖  I wanna try AI Coach")
+    val fitnessGoals: List<String> = listOf("🤖  I wanna try AI Coach"),
+    val avatarPath: String = "premade_bunny"
 )
 
 class AssessmentViewModel : ViewModel() {
@@ -40,6 +41,10 @@ class AssessmentViewModel : ViewModel() {
 
     fun onGenderSelect(gender: String) {
         _uiState.update { it.copy(gender = gender) }
+    }
+
+    fun onAvatarChange(path: String) {
+        _uiState.update { it.copy(avatarPath = path) }
     }
 
     fun onGoalToggle(goal: String) {

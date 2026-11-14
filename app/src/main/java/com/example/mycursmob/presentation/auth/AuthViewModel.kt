@@ -99,6 +99,7 @@ class AuthViewModel(
         fitnessLevelName: String,
         gender: String,
         fitnessGoals: List<String>,
+        avatarPath: String = "",
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -109,11 +110,21 @@ class AuthViewModel(
                 fitnessLevel = fitnessLevel,
                 fitnessLevelName = fitnessLevelName,
                 gender = gender,
-                fitnessGoals = fitnessGoals
+                fitnessGoals = fitnessGoals,
+                avatarPath = avatarPath
             )
             if (result.isSuccess) {
                 _uiState.update { it.copy(currentUser = result.getOrNull()) }
                 onSuccess()
+            }
+        }
+    }
+
+    fun updateAvatar(avatarPath: String) {
+        viewModelScope.launch {
+            val result = repository.saveAvatar(avatarPath)
+            if (result.isSuccess) {
+                _uiState.update { it.copy(currentUser = result.getOrNull()) }
             }
         }
     }
