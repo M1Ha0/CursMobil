@@ -2,6 +2,7 @@ package com.example.mycursmob.presentation.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mycursmob.data.UserSessionManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,8 @@ data class OnboardingUiState(
 )
 
 sealed class OnboardingNavigationEvent {
+    object NavigateToHome : OnboardingNavigationEvent()
+    object NavigateToAssessment : OnboardingNavigationEvent()
     object NavigateToWelcome : OnboardingNavigationEvent()
     object NavigateToGetStarted : OnboardingNavigationEvent()
     object NavigateToSignIn : OnboardingNavigationEvent()
@@ -37,8 +40,16 @@ class OnboardingViewModel : ViewModel() {
 
     private fun startSplashTimer() {
         viewModelScope.launch {
-            delay(2500L) // Задержка 2.5 секунды перед переходом на Welcome Screen
-            _navigationEvent.emit(OnboardingNavigationEvent.NavigateToWelcome)
+            delay(1800L)
+            if (UserSessionManager.isLoggedIn()) {
+                if (UserSessionManager.isAssessmentCompleted()) {
+                    _navigationEvent.emit(OnboardingNavigationEvent.NavigateToHome)
+                } else {
+                    _navigationEvent.emit(OnboardingNavigationEvent.NavigateToAssessment)
+                }
+            } else {
+                _navigationEvent.emit(OnboardingNavigationEvent.NavigateToWelcome)
+            }
         }
     }
 

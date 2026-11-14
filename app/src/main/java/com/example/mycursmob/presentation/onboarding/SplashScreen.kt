@@ -14,22 +14,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-//import com.example.upliftai.ui.components.UpliftLogo
+import com.example.mycursmob.presentation.components.UpliftLogo
+import com.example.mycursmob.ui.theme.BrandOrange
 import kotlinx.coroutines.flow.collectLatest
-
-val BrandOrange = Color(0xFFF26B13)
 
 @Composable
 fun SplashScreen(
     viewModel: OnboardingViewModel,
-    onNavigateToWelcome: () -> Unit
+    onNavigateToWelcome: () -> Unit,
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToAssessment: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.navigationEvent.collectLatest { event ->
-            if (event is OnboardingNavigationEvent.NavigateToWelcome) {
-                onNavigateToWelcome()
+            when (event) {
+                is OnboardingNavigationEvent.NavigateToHome -> onNavigateToHome()
+                is OnboardingNavigationEvent.NavigateToAssessment -> onNavigateToAssessment()
+                is OnboardingNavigationEvent.NavigateToWelcome -> onNavigateToWelcome()
+                else -> Unit
             }
         }
     }
@@ -45,27 +49,26 @@ fun SplashScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-//            UpliftLogo(
-//                modifier = Modifier.size(130.dp),
-//                color = Color.White
-//            )
+            // Uplift Logo
+            UpliftLogo(size = 110.dp)
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
                 text = uiState.appName,
                 color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = uiState.splashSubtitle,
                 color = Color.White.copy(alpha = 0.9f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center
             )
         }
