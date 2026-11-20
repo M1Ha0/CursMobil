@@ -167,6 +167,7 @@ fun FitnessAppNavigation() {
             )
         }
 
+
         composable("home") {
             HomeScreen(
                 authViewModel = authViewModel,
