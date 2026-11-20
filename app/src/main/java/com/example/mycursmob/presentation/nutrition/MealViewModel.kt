@@ -29,13 +29,28 @@ data class MealUiState(
     val currentMeals: List<MealItem>
         get() = mealsMap[currentKey] ?: emptyList()
 
-    val todayTotalCalories: Int
+    val todayMeals: List<MealItem>
         get() {
             val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())
-            return MealCategory.entries.sumOf { cat ->
-                (mealsMap["${todayKey}_${cat.name}"] ?: emptyList()).sumOf { it.calories }
+            return MealCategory.entries.flatMap { cat ->
+                mealsMap["${todayKey}_${cat.name}"] ?: emptyList()
             }
         }
+
+    val todayTotalCalories: Int
+        get() = todayMeals.sumOf { it.calories }
+
+    val todayTotalProteinG: Float
+        get() = todayMeals.map { it.proteinG }.sum()
+
+    val todayTotalFatsG: Float
+        get() = todayMeals.map { it.fatsG }.sum()
+
+    val todayTotalCarbsG: Float
+        get() = todayMeals.map { it.carbsG }.sum()
+
+    val todayTotalMacroG: Float
+        get() = todayTotalProteinG + todayTotalFatsG + todayTotalCarbsG
 }
 
 class MealViewModel : ViewModel() {

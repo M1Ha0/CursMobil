@@ -44,7 +44,8 @@ fun HomeScreen(
     onLogout: () -> Unit,
     onNavigateToAvatarSelection: () -> Unit = {},
     onNavigateToNutrition: () -> Unit = {},
-    onNavigateToHydration: () -> Unit = {}
+    onNavigateToHydration: () -> Unit = {},
+    onNavigateToStats: () -> Unit = {}
 ) {
     val authState by authViewModel.uiState.collectAsState()
     val mealUiState by mealViewModel.uiState.collectAsState()
@@ -278,6 +279,7 @@ fun HomeScreen(
         var selectedCategory by remember { mutableStateOf("Hydration") }
         val categories = listOf(
             Triple("💧", "Hydration", CategoryVegetableBlue),
+            Triple("📊", "Stats", CategoryChipBg),
             Triple("🖤", "Score", CategoryChipBg),
             Triple("🍐", "Calorie", CategoryChipBg),
             Triple("🥩", "Meat", CategoryChipBg),
@@ -301,6 +303,8 @@ fun HomeScreen(
                             selectedCategory = name
                             if (name == "Hydration") {
                                 onNavigateToHydration()
+                            } else if (name == "Stats") {
+                                onNavigateToStats()
                             } else if (name == "Calorie") {
                                 showCalorieCard = !showCalorieCard
                             }

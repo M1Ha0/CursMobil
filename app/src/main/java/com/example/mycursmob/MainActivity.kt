@@ -21,6 +21,7 @@ import com.example.mycursmob.presentation.avatar.AvatarSelectionScreen
 import com.example.mycursmob.presentation.home.HomeScreen
 import com.example.mycursmob.presentation.hydration.HydrationScreen
 import com.example.mycursmob.presentation.hydration.HydrationViewModel
+import com.example.mycursmob.presentation.nutrition.CalorieStatsScreen
 import com.example.mycursmob.presentation.nutrition.MealViewModel
 import com.example.mycursmob.presentation.nutrition.MyMealsScreen
 import com.example.mycursmob.presentation.nutrition.NutritionDetailScreen
@@ -183,6 +184,18 @@ fun FitnessAppNavigation() {
                 },
                 onNavigateToHydration = {
                     navController.navigate("hydration")
+                },
+                onNavigateToStats = {
+                    navController.navigate("calorie_stats")
+                }
+            )
+        }
+
+        composable("calorie_stats") {
+            CalorieStatsScreen(
+                viewModel = mealViewModel,
+                onBack = {
+                    navController.popBackStack()
                 }
             )
         }

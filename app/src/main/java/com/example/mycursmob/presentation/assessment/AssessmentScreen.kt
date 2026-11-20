@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -46,7 +47,9 @@ import com.example.mycursmob.R
 import com.example.mycursmob.ui.theme.*
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // ──────────────────────── Main Assessment Screen ────────────────────────
@@ -65,15 +68,8 @@ fun AssessmentScreen(
             .background(if (isWeightStep) BrandOrange else BackgroundWhite)
             .padding(top = 44.dp)
     ) {
-        // ── Top Bar with dynamic badge (1 of 7, 2 of 7, 3 of 7, 4 of 7, 6 of 7, 7 of 7) ──
-        val stepBadgeLabel = when (state.currentStep) {
-            1 -> "1 of 7"
-            2 -> "2 of 7"
-            3 -> "3 of 7"
-            4 -> "4 of 7"
-            5 -> "6 of 7"
-            else -> "7 of 7"
-        }
+        // ── Top Bar with dynamic badge (1 of 6, 2 of 6, 3 of 6, etc.) ──
+        val stepBadgeLabel = "${state.currentStep} of 6"
 
         AssessmentTopBar(
             stepLabel = stepBadgeLabel,
@@ -350,59 +346,109 @@ private fun WeightStep(
         Text(
             text = "$displayWeight $unit",
             color = Color.White,
-            fontSize = 50.sp,
+            fontSize = 52.sp,
             fontWeight = FontWeight.ExtraBold
         )
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         val weightRange = remember { (30..150).toList() }
-        val listState = rememberLazyListState()
+        val initialIndex = remember { (weightRange.indexOf(weight)).coerceAtLeast(0) }
+        val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+        val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
         val coroutineScope = rememberCoroutineScope()
 
-        LaunchedEffect(weight) {
-            val index = weightRange.indexOf(weight)
-            if (index >= 0) listState.animateScrollToItem(index)
+        // Real-time adaptive weight tracking as the user drags/scrolls the ruler
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val layoutInfo = listState.layoutInfo
+                val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2
+                layoutInfo.visibleItemsInfo.minByOrNull { item ->
+                    val itemCenter = item.offset + item.size / 2
+                    kotlin.math.abs(itemCenter - viewportCenter)
+                }?.index
+            }.collect { centeredIndex ->
+                if (centeredIndex != null && centeredIndex in weightRange.indices) {
+                    val newWeight = weightRange[centeredIndex]
+                    if (newWeight != weight) {
+                        onWeightChange(newWeight)
+                    }
+                }
+            }
         }
 
-        LazyRow(
-            state = listState,
+        // Programmatic scroll on external change (e.g. initial load or unit switch) without fighting user drag
+        LaunchedEffect(weight) {
+            if (!listState.isScrollInProgress) {
+                val targetIndex = weightRange.indexOf(weight)
+                if (targetIndex >= 0) {
+                    val layoutInfo = listState.layoutInfo
+                    val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2
+                    val currentIndex = layoutInfo.visibleItemsInfo.minByOrNull {
+                        kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
+                    }?.index
+                    if (currentIndex != targetIndex) {
+                        listState.scrollToItem(targetIndex)
+                    }
+                }
+            }
+        }
+
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(70.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(horizontal = 140.dp),
-            verticalAlignment = Alignment.Top
+                .height(86.dp)
         ) {
-            items(weightRange) { w ->
-                val isMajor = w % 5 == 0
-                val isSelected = w == weight
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable {
-                        onWeightChange(w)
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(weightRange.indexOf(w))
-                        }
-                    }
-                ) {
-                    Box(
+            val halfWidth = maxWidth / 2
+
+            // Center needle indicator
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .width(3.dp)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(Color.White)
+            )
+
+            LazyRow(
+                state = listState,
+                flingBehavior = snapFlingBehavior,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = halfWidth),
+                verticalAlignment = Alignment.Top
+            ) {
+                items(weightRange) { w ->
+                    val isMajor = w % 5 == 0
+                    val isSelected = w == weight
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .width(if (isSelected) 3.dp else if (isMajor) 2.dp else 1.dp)
-                            .height(if (isSelected) 38.dp else if (isMajor) 32.dp else 18.dp)
-                            .background(
-                                if (isSelected) Color.White
-                                else Color.White.copy(alpha = if (isMajor) 0.85f else 0.4f)
-                            )
-                    )
-                    if (isMajor) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "$w",
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
+                            .width(18.dp)
+                            .clickable {
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(weightRange.indexOf(w))
+                                }
+                            }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(if (isSelected) 3.dp else if (isMajor) 2.dp else 1.dp)
+                                .height(if (isSelected) 42.dp else if (isMajor) 32.dp else 18.dp)
+                                .background(
+                                    if (isSelected) Color.White
+                                    else Color.White.copy(alpha = if (isMajor) 0.85f else 0.4f)
+                                )
                         )
+                        if (isMajor) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "$w",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -433,66 +479,99 @@ private fun FitnessLevelArcStep(
         Text(
             text = "How would you rate\nyour fitness level?",
             color = TextPrimary,
-            fontSize = 26.sp,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            lineHeight = 32.sp
+            lineHeight = 34.sp
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
                 imageVector = Icons.Filled.Sync,
                 contentDescription = null,
                 tint = TextSecondary,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "Drag to adjust",
                 color = TextSecondary,
-                fontSize = 13.sp
+                fontSize = 14.sp
             )
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
+        // Fixed-layout container so slider position never shifts regardless of number/text size
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                .height(320.dp)
         ) {
+            val arcBoxSize = 275.dp
+            val thumbSize = 58.dp
+            val arcSizeRatio = 0.90f
+            val startAngle = 130f
+            val totalSweep = 175f
+            val fraction = (level - 1) / 4f
+
+            // 1. Slider Arc Box (Left-aligned with fixed position)
             Box(
                 modifier = Modifier
-                    .size(190.dp)
+                    .size(arcBoxSize)
+                    .align(Alignment.CenterStart)
                     .pointerInput(Unit) {
                         detectDragGestures { change, _ ->
-                            val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                            val newLevel = (1 + fraction * 4).toInt().coerceIn(1, 5)
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val dx = change.position.x - cx
+                            val dy = change.position.y - cy
+                            var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                            if (angle < 0f) angle += 360f
+
+                            val f = when {
+                                angle < 130f && angle >= 60f -> 0f
+                                angle > 305f || angle < 60f -> 1f
+                                else -> ((angle - 130f) / 175f).coerceIn(0f, 1f)
+                            }
+                            val newLevel = (1 + f * 4).roundToInt().coerceIn(1, 5)
                             onLevelChange(newLevel)
                         }
                     }
                     .pointerInput(Unit) {
                         detectTapGestures { offset ->
-                            val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            val newLevel = (1 + fraction * 4).toInt().coerceIn(1, 5)
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val dx = offset.x - cx
+                            val dy = offset.y - cy
+                            var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                            if (angle < 0f) angle += 360f
+
+                            val f = when {
+                                angle < 130f && angle >= 60f -> 0f
+                                angle > 305f || angle < 60f -> 1f
+                                else -> ((angle - 130f) / 175f).coerceIn(0f, 1f)
+                            }
+                            val newLevel = (1 + f * 4).roundToInt().coerceIn(1, 5)
                             onLevelChange(newLevel)
                         }
                     },
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val strokeWidth = 7.dp.toPx()
-                    val arcSize = size.width * 0.85f
-                    val topLeft = Offset((size.width - arcSize) / 2f, (size.height - arcSize) / 2f)
-
-                    val startAngle = 145f
-                    val totalSweep = 135f
-                    val fraction = (level - 1) / 4f
+                    val strokeWidth = 9.dp.toPx()
+                    val arcPx = size.width * arcSizeRatio
+                    val topLeft = Offset((size.width - arcPx) / 2f, (size.height - arcPx) / 2f)
                     val activeSweep = totalSweep * fraction
+                    val radius = arcPx / 2f
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
 
                     // Inactive Arc (Black/Dark)
                     drawArc(
@@ -501,7 +580,7 @@ private fun FitnessLevelArcStep(
                         sweepAngle = totalSweep - activeSweep,
                         useCenter = false,
                         topLeft = topLeft,
-                        size = Size(arcSize, arcSize),
+                        size = Size(arcPx, arcPx),
                         style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
 
@@ -513,43 +592,40 @@ private fun FitnessLevelArcStep(
                             sweepAngle = activeSweep,
                             useCenter = false,
                             topLeft = topLeft,
-                            size = Size(arcSize, arcSize),
+                            size = Size(arcPx, arcPx),
                             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                         )
                     }
 
-                    // End tick mark
-                    val endAngleRad = Math.toRadians((startAngle + totalSweep).toDouble())
-                    val radius = arcSize / 2f
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    val tickStartX = cx + (radius - 8.dp.toPx()) * cos(endAngleRad).toFloat()
-                    val tickStartY = cy + (radius - 8.dp.toPx()) * sin(endAngleRad).toFloat()
-                    val tickEndX = cx + (radius + 8.dp.toPx()) * cos(endAngleRad).toFloat()
-                    val tickEndY = cy + (radius + 8.dp.toPx()) * sin(endAngleRad).toFloat()
-                    drawLine(
-                        color = BrandDark,
-                        start = Offset(tickStartX, tickStartY),
-                        end = Offset(tickEndX, tickEndY),
-                        strokeWidth = 3.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
+                    // Draw tick marks across all 5 levels (1 to 5)
+                    for (i in 0..4) {
+                        val tickFraction = i / 4f
+                        val tickAngleRad = Math.toRadians((startAngle + totalSweep * tickFraction).toDouble())
+                        val tickStartX = cx + (radius - 12.dp.toPx()) * cos(tickAngleRad).toFloat()
+                        val tickStartY = cy + (radius - 12.dp.toPx()) * sin(tickAngleRad).toFloat()
+                        val tickEndX = cx + (radius + 12.dp.toPx()) * cos(tickAngleRad).toFloat()
+                        val tickEndY = cy + (radius + 12.dp.toPx()) * sin(tickAngleRad).toFloat()
+                        drawLine(
+                            color = BrandDark,
+                            start = Offset(tickStartX, tickStartY),
+                            end = Offset(tickEndX, tickEndY),
+                            strokeWidth = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
 
-                // Orange Squircle Thumb
-                val fraction = (level - 1) / 4f
-                val startAngle = 145f
-                val totalSweep = 135f
+                // Orange Squircle Thumb (Enlarged)
                 val currentAngleRad = Math.toRadians((startAngle + totalSweep * fraction).toDouble())
-                val radiusDp = (190 * 0.85f / 2f).dp
+                val radiusDp = (275 * arcSizeRatio / 2f).dp
                 val thumbOffsetXDp = radiusDp * cos(currentAngleRad).toFloat()
                 val thumbOffsetYDp = radiusDp * sin(currentAngleRad).toFloat()
 
                 Box(
                     modifier = Modifier
                         .offset(x = thumbOffsetXDp, y = thumbOffsetYDp)
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .size(thumbSize)
+                        .clip(RoundedCornerShape(18.dp))
                         .background(BrandOrange),
                     contentAlignment = Alignment.Center
                 ) {
@@ -557,29 +633,35 @@ private fun FitnessLevelArcStep(
                         imageVector = Icons.Filled.Sync,
                         contentDescription = "Thumb",
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(18.dp))
-
+            // 2. Fixed Number and Description (Strictly fixed width & position so digit never moves)
             Column(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .width(170.dp)
+                    .padding(end = 4.dp, bottom = 24.dp),
                 horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = "$level",
                     color = BrandDark,
-                    fontSize = 92.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    lineHeight = 94.sp
+                    fontSize = 112.sp,
+                    fontWeight = FontWeight.Black,
+                    lineHeight = 110.sp,
+                    modifier = Modifier.width(170.dp)
                 )
                 Text(
                     text = levelNames[level] ?: "",
                     color = BrandDark,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    modifier = Modifier.width(170.dp)
                 )
             }
         }
@@ -594,53 +676,57 @@ private fun GenderStep(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "What is your gender?",
             color = TextPrimary,
-            fontSize = 26.sp,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         GenderCard(
             label = "Male",
             iconSymbol = "♂",
-            imageRes = R.drawable.runner_male,
+            imageRes = R.drawable.gender_male_bg,
             isSelected = selectedGender == "Male",
             onClick = { onGenderSelect("Male") }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         GenderCard(
             label = "Female",
             iconSymbol = "♀",
-            imageRes = R.drawable.runner_female,
+            imageRes = R.drawable.gender_female_bg,
             isSelected = selectedGender == "Female",
             onClick = { onGenderSelect("Female") }
         )
 
-        Spacer(modifier = Modifier.height(26.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(PeachSkipButtonBg)
-                .clickable { onGenderSelect("") }
-                .padding(horizontal = 32.dp, vertical = 10.dp)
+                .fillMaxWidth()
+                .height(52.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFFFFF0E5))
+                .clickable { onGenderSelect("") },
+            contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Prefer to skip, thanks! ✕",
+                text = "Prefer to skip, thanks!  ✕",
                 color = BrandOrange,
-                fontSize = 13.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
         }
+
+        Spacer(modifier = Modifier.height(10.dp))
     }
 }
 
@@ -652,73 +738,94 @@ private fun GenderCard(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val cardBg = if (isSelected) Color(0xFFFFF7F2) else Color(0xFFF6F7F9)
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(138.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        border = if (isSelected) BorderStroke(2.dp, BrandOrange) else BorderStroke(1.dp, InputBorderDefault),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) BackgroundWhite else InputBackground
-        )
+        shape = RoundedCornerShape(22.dp),
+        border = if (isSelected) BorderStroke(2.dp, BrandOrange) else BorderStroke(1.dp, Color(0xFFEBECEF)),
+        colors = CardDefaults.cardColors(containerColor = cardBg)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .border(
-                        2.dp,
-                        if (isSelected) BrandOrange else TextMuted,
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isSelected) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(BrandOrange)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = iconSymbol,
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = label,
-                    color = TextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Photo on the right side
             Image(
                 painter = painterResource(id = imageRes),
                 contentDescription = label,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .width(82.dp)
-                    .height(58.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.56f)
+                    .clip(RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp))
             )
+
+            // Gradient overlay to smoothly fade the image left edge into card background
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.56f)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                cardBg,
+                                cardBg.copy(alpha = 0.5f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Text info & Checkbox on the left
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.Start
+            ) {
+                // Gender label & symbol
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = iconSymbol,
+                        color = BrandDark,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = label,
+                        color = BrandDark,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Checkbox matching Figma (rounded square with inner marker when selected)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .border(
+                            width = 2.dp,
+                            color = if (isSelected) BrandDark else Color(0xFF8E8E93),
+                            shape = RoundedCornerShape(7.dp)
+                        )
+                        .background(Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .size(11.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(BrandDark)
+                        )
+                    }
+                }
+            }
         }
     }
 }
