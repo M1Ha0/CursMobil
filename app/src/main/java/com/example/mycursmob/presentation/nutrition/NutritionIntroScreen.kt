@@ -10,7 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,12 +23,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mycursmob.R
 import com.example.mycursmob.ui.theme.BrandDark
+import com.example.mycursmob.ui.theme.BrandOrange
+import kotlinx.coroutines.delay
 
 @Composable
 fun NutritionIntroScreen(
     onExplore: () -> Unit,
     onBack: () -> Unit
 ) {
+    // Splash / Loading progress state (авто-загрузка как при входе в приложение)
+    var progress by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        val duration = 1800L
+        val startTime = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - startTime
+            progress = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
+            if (progress >= 1f) {
+                onExplore()
+                break
+            }
+            delay(16L)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -81,13 +100,13 @@ fun NutritionIntroScreen(
             }
         }
 
-        // Center / Lower Title & Bottom CTA
+        // Center / Lower Title & Bottom CTA (поднято повыше: padding bottom = 85.dp)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 44.dp)
+                .padding(bottom = 85.dp)
         ) {
             Text(
                 text = "Personalized\nNutrition Starts\nHere.",
@@ -97,7 +116,20 @@ fun NutritionIntroScreen(
                 lineHeight = 42.sp
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Smooth animated loading indicator (загрузка)
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = BrandOrange,
+                trackColor = Color.White.copy(alpha = 0.3f)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             Button(
                 onClick = onExplore,

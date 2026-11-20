@@ -52,7 +52,7 @@ fun WelcomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 28.dp)
-                .padding(bottom = 44.dp),
+                .padding(bottom = 85.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom
         ) {

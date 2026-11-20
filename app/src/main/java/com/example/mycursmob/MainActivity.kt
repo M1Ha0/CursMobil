@@ -202,7 +202,9 @@ fun FitnessAppNavigation() {
         composable("nutrition_intro") {
             NutritionIntroScreen(
                 onExplore = {
-                    navController.navigate("my_meals")
+                    navController.navigate("my_meals") {
+                        popUpTo("nutrition_intro") { inclusive = true }
+                    }
                 },
                 onBack = {
                     navController.popBackStack()
@@ -214,7 +216,9 @@ fun FitnessAppNavigation() {
             MyMealsScreen(
                 viewModel = mealViewModel,
                 onBack = {
-                    navController.popBackStack()
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = false }
+                    }
                 },
                 onNavigateToAddMeal = {
                     navController.navigate("nutrition_detail")
